@@ -1,0 +1,49 @@
+name: Cross-platform app
+
+on:
+  push:
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  pull_request:
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest pyinstaller
+      - name: Tests (fake Messages database and iPhone backup)
+        run: python -m pytest -q
+      - name: Build (Mac)
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller --noconfirm --windowed --name "Download My Messages" \
+            --add-data "messageexport/static:messageexport/static" run.py
+          cd dist && ditto -c -k --keepParent "Download My Messages.app" "Download My Messages (cross-platform).zip"
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name "Download My Messages" \
+            --add-data "messageexport/static;messageexport/static" run.py
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: Download-My-Messages-crossplatform-mac
+          path: desktop/dist/Download My Messages (cross-platform).zip
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: Download-My-Messages-windows
+          path: desktop/dist/Download My Messages.exe
