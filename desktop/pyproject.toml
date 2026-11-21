@@ -1,0 +1,15 @@
+[project]
+name = "messageexport"
+version = "0.1.0"
+description = "Export iMessage and SMS conversations to CSV and JSON, with a date range per conversation."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest", "pyinstaller"]
+
+[tool.setuptools.package-data]
+messageexport = ["static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

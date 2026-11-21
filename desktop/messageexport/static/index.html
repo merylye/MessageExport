@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Download My Messages</title>
+<style>
+  :root {
+    --bg: #f6f6f8; --panel: #ffffff; --text: #1d1d1f; --muted: #6e6e73; --border: #d9d9de;
+    --accent: #0a66d8; --accent-text: #ffffff; --row-hover: #f0f4fb; --danger: #b3261e; --note: #eef3fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1e; --panel: #2c2c2e; --text: #f2f2f7; --muted: #a1a1a6; --border: #3a3a3c;
+      --accent: #3b8cff; --accent-text: #ffffff; --row-hover: #34343a; --danger: #ff6b60; --note: #26303f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 14px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border); background: var(--panel); }
+  header h1 { font-size: 17px; margin: 0 12px 0 0; }
+  main { padding: 14px 20px 180px; }
+  select, input[type=text], input[type=date], button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 5px 9px; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; padding: 7px 16px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .spacer { flex: 1; }
+  .muted { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { font-weight: 600; font-size: 12px; color: var(--muted); position: sticky; top: 0; background: var(--panel); }
+  tbody tr:hover { background: var(--row-hover); }
+  td.num { font-variant-numeric: tabular-nums; }
+  .title { font-weight: 500; }
+  .sub { font-size: 12px; color: var(--muted); max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .range { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .panel { background: var(--note); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin: 10px 0; }
+  .panel h2 { margin: 0 0 8px; font-size: 16px; }
+  .error { color: var(--danger); margin: 8px 0; }
+  footer { position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--border); padding: 12px 20px; }
+  footer .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  footer label { display: inline-flex; gap: 6px; align-items: center; }
+  #folder { width: 320px; max-width: 100%; }
+  progress { width: 100%; margin-top: 8px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Download My Messages</h1>
+  <label>Read from <select id="source"></select></label>
+  <button id="chooseBackup">Choose iPhone backup…</button>
+  <button id="reload">Reload</button>
+  <span class="spacer"></span>
+  <span id="loading" class="muted hidden">Reading messages…</span>
+  <button id="quit" title="Stop the app">Quit</button>
+</header>
+
+<main>
+  <div id="error" class="error hidden"></div>
+
+  <div id="fda" class="panel hidden">
+    <h2>One-time setup: allow access to your messages</h2>
+    <p>macOS protects your Messages history. To let this app read it:</p>
+    <ol>
+      <li>Click <b>Open System Settings</b>.</li>
+      <li>Turn on the switch next to <b>Download My Messages</b>. If it isn't listed, click <b>+</b> and choose the app.</li>
+      <li>Quit this app and open it again.</li>
+    </ol>
+    <p class="muted">Your messages stay on this computer. Nothing is uploaded.</p>
+    <button id="openSettings" class="primary">Open System Settings</button>
+    <button id="retry">Try again</button>
+  </div>
+
+  <div id="manualBackup" class="panel hidden">
+    <h2>Use an iPhone backup</h2>
+    <p>Paste the path to a backup folder (it contains a file named Manifest.db).</p>
+    <input type="text" id="backupPath" style="width: 520px; max-width: 100%" placeholder="Backup folder path">
+    <button id="addBackup">Use this backup</button>
+  </div>
+
+  <div id="empty" class="panel hidden">
+    <h2>No conversations to show</h2>
+    <p id="emptyText"></p>
+  </div>
+
+  <div id="listArea" class="hidden">
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Search conversations" style="width: 260px">
+      <button id="selectAll">Select all</button>
+      <button id="selectNone">Select none</button>
+      <label>Set range for selected
+        <select id="bulkPreset">
+          <option value="">Choose…</option>
+          <option value="all">All time</option>
+          <option value="30d">Last 30 days</option>
+          <option value="6m">Last 6 months</option>
+          <option value="1y">Last year</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      <span class="spacer"></span>
+      <span id="summary" class="muted"></span>
+    </div>
+    <table>
+      <thead>
+        <tr><th style="width:56px">Export</th><th>Conversation</th><th>Messages</th><th>First</th><th>Last</th><th>Date range to export</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+
+<footer>
+  <div class="row">
+    <label><input type="checkbox" id="csv" checked> CSV (opens in Excel/Sheets)</label>
+    <label><input type="checkbox" id="json" checked> JSON (for analysis)</label>
+    <label title="When off, the export records only each attachment's file type."><input type="checkbox" id="copyAttachments"> Copy attachments</label>
+    <span class="spacer"></span>
+    <label>Save to <input type="text" id="folder"></label>
+    <button id="browse">Browse…</button>
+    <button id="export" class="primary" disabled>Export</button>
+  </div>
+  <progress id="progress" class="hidden" max="1" value="0"></progress>
+  <div class="row" style="margin-top:6px">
+    <span id="status" class="muted"></span>
+    <span class="spacer"></span>
+    <button id="showFolder" class="hidden">Show export folder</button>
+  </div>
+</footer>
+
+<script>
+const token = new URLSearchParams(location.hash.slice(1)).get("token") || "";
+const $ = (id) => document.getElementById(id);
+let sources = [];
+let rows = [];          // {conv, selected, preset, start, end}
+let platform = "";
+
+async function api(path, body) {
+  const opts = { headers: { "X-Token": token } };
+  if (body !== undefined) {
+    opts.method = "POST";
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(path, opts);
+  if (res.status === 403) throw new Error("This page has expired. Close it and open the app again.");
+  return res.json();
+}
+
+function showError(message) {
+  $("error").textContent = message || "";
+  $("error").classList.toggle("hidden", !message);
+}
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function dayString(date) {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function sourceKey(s) { return s.kind === "mac" ? "mac" : "backup:" + s.path; }
+
+async function loadSources(selectKey) {
+  const data = await api("/api/sources");
+  sources = data.sources;
+  platform = data.platform;
+  if (!$("folder").value) $("folder").value = data.defaultExportDir;
+  $("browse").classList.toggle("hidden", !data.dialogs);
+  const select = $("source");
+  select.innerHTML = "";
+  for (const s of sources) {
+    const opt = document.createElement("option");
+    opt.value = sourceKey(s);
+    opt.textContent = s.label + (s.isEncrypted ? " (encrypted)" : "");
+    select.appendChild(opt);
+  }
+  if (selectKey && sources.some((s) => sourceKey(s) === selectKey)) select.value = selectKey;
+  $("chooseBackup").textContent = data.dialogs ? "Choose iPhone backup…" : "Use a backup folder…";
+  $("chooseBackup").dataset.dialogs = data.dialogs ? "1" : "";
+}
+
+async function loadConversations() {
+  showError("");
+  $("fda").classList.add("hidden");
+  $("empty").classList.add("hidden");
+  $("listArea").classList.add("hidden");
+  const source = sources.find((s) => sourceKey(s) === $("source").value);
+  if (!source) {
+    $("empty").classList.remove("hidden");
+    $("emptyText").textContent = platform === "darwin"
+      ? "No message sources found."
+      : "No iPhone backups found. Connect your iPhone, open the Apple Devices app (or iTunes), turn off \"Encrypt local backup\", click \"Back Up Now\", then click Reload.";
+    updateFooter();
+    return;
+  }
+  $("loading").classList.remove("hidden");
+  setStatus("Reading messages…");
+  try {
+    const data = await api("/api/load", { source });
+    if (data.needsFullDiskAccess) {
+      $("fda").classList.remove("hidden");
+      setStatus("");
+      rows = [];
+    } else if (data.error) {
+      showError(data.error);
+      setStatus("");
+      rows = [];
+    } else {
+      rows = data.conversations.map((conv) => ({
+        conv, selected: false, preset: "all",
+        start: dayString(conv.firstDate || Date.now()),
+        end: dayString(conv.lastDate || Date.now()),
+      }));
+      const total = rows.reduce((n, r) => n + r.conv.messageCount, 0);
+      setStatus(`${rows.length} conversations, ${total.toLocaleString()} messages` +
+        (data.contactsFound ? "" : ". Contact names unavailable, so phone numbers are shown."));
+      if (rows.length) {
+        $("listArea").classList.remove("hidden");
+      } else {
+        $("empty").classList.remove("hidden");
+        $("emptyText").textContent = "This source has no conversations.";
+      }
+    }
+  } catch (e) {
+    showError(e.message);
+  }
+  $("loading").classList.add("hidden");
+  render();
+}
+
+function visibleRows() {
+  const q = $("search").value.trim().toLowerCase();
+  if (!q) return rows;
+  return rows.filter((r) => r.conv.title.toLowerCase().includes(q) || r.conv.handles.some((h) => h.toLowerCase().includes(q)));
+}
+
+function rangeCell(r, index) {
+  const custom = r.preset === "custom";
+  return `<div class="range">
+    <select data-i="${index}" data-field="preset">
+      ${[["all", "All time"], ["30d", "Last 30 days"], ["6m", "Last 6 months"], ["1y", "Last year"], ["custom", "Custom"]]
+        .map(([v, l]) => `<option value="${v}" ${r.preset === v ? "selected" : ""}>${l}</option>`).join("")}
+    </select>
+    ${custom ? `<input type="date" data-i="${index}" data-field="start" value="${r.start}">
+      <span class="muted">to</span>
+      <input type="date" data-i="${index}" data-field="end" value="${r.end}">` : ""}
+  </div>`;
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function render() {
+  const body = $("rows");
+  body.innerHTML = visibleRows().map((r) => {
+    const i = rows.indexOf(r);
+    const sub = (r.conv.isGroup ? "Group · " : "") + r.conv.handles.join(", ");
+    return `<tr>
+      <td><input type="checkbox" data-i="${i}" data-field="selected" ${r.selected ? "checked" : ""}></td>
+      <td><div class="title">${escapeHTML(r.conv.title)}</div><div class="sub">${escapeHTML(sub)}</div></td>
+      <td class="num">${r.conv.messageCount.toLocaleString()}</td>
+      <td>${fmtDate(r.conv.firstDate)}</td>
+      <td>${fmtDate(r.conv.lastDate)}</td>
+      <td>${rangeCell(r, i)}</td>
+    </tr>`;
+  }).join("");
+  updateFooter();
+}
+
+function updateFooter() {
+  const selected = rows.filter((r) => r.selected).length;
+  $("summary").textContent = `${selected} selected`;
+  const formats = $("csv").checked || $("json").checked;
+  $("export").disabled = !(selected && formats) || exporting;
+}
+
+function rangeFor(r, now = new Date()) {
+  const d = new Date(now);
+  switch (r.preset) {
+    case "30d": d.setDate(d.getDate() - 30); return { start: d.toISOString(), end: null };
+    case "6m": d.setMonth(d.getMonth() - 6); return { start: d.toISOString(), end: null };
+    case "1y": d.setFullYear(d.getFullYear() - 1); return { start: d.toISOString(), end: null };
+    case "custom": {
+      let [a, b] = [r.start, r.end].sort();
+      const [ay, am, ad] = a.split("-").map(Number);
+      const [by, bm, bd] = b.split("-").map(Number);
+      return { start: new Date(ay, am - 1, ad, 0, 0, 0).toISOString(), end: new Date(by, bm - 1, bd, 23, 59, 59).toISOString() };
+    }
+    default: return { start: null, end: null };
+  }
+}
+
+function setStatus(text) { $("status").textContent = text; }
+
+let exporting = false;
+async function startExport() {
+  showError("");
+  const now = new Date();
+  const payload = {
+    rows: rows.filter((r) => r.selected).map((r) => ({ id: r.conv.id, ...rangeFor(r, now) })),
+    csv: $("csv").checked,
+    json: $("json").checked,
+    copyAttachments: $("copyAttachments").checked,
+    folder: $("folder").value.trim(),
+  };
+  const res = await api("/api/export", payload);
+  if (res.error) { showError(res.error); return; }
+  exporting = true;
+  updateFooter();
+  $("showFolder").classList.add("hidden");
+  $("progress").classList.remove("hidden");
+  pollExport();
+}
+
+async function pollExport() {
+  const s = await api("/api/export-status");
+  $("progress").value = s.progress || 0;
+  setStatus(s.status || "");
+  if (s.running) { setTimeout(pollExport, 400); return; }
+  exporting = false;
+  $("progress").classList.add("hidden");
+  if (s.error) { showError(s.error); setStatus(""); }
+  else if (s.result) {
+    const r = s.result;
+    let msg = `Exported ${r.messages.toLocaleString()} messages from ${r.conversations} conversations to ${r.folder}.`;
+    if (r.copiedAttachments) {
+      msg += ` Copied ${r.attachmentsCopied} attachments`;
+      msg += r.attachmentsMissing ? `; ${r.attachmentsMissing} weren't on this computer (often stored only in iCloud).` : ".";
+    }
+    setStatus(msg);
+    $("showFolder").classList.remove("hidden");
+  }
+  updateFooter();
+}
+
+// ---- events ----
+$("rows").addEventListener("change", (e) => {
+  const el = e.target;
+  const r = rows[Number(el.dataset.i)];
+  if (!r) return;
+  const field = el.dataset.field;
+  if (field === "selected") { r.selected = el.checked; updateFooter(); return; }
+  r[field] = el.value;
+  if (field === "preset") render();
+});
+$("search").addEventListener("input", render);
+$("selectAll").onclick = () => { visibleRows().forEach((r) => (r.selected = true)); render(); };
+$("selectNone").onclick = () => { visibleRows().forEach((r) => (r.selected = false)); render(); };
+$("bulkPreset").onchange = (e) => {
+  if (!e.target.value) return;
+  rows.filter((r) => r.selected).forEach((r) => (r.preset = e.target.value));
+  e.target.value = "";
+  render();
+};
+$("csv").onchange = updateFooter;
+$("json").onchange = updateFooter;
+$("source").onchange = loadConversations;
+$("reload").onclick = async () => { await loadSources($("source").value); loadConversations(); };
+$("retry").onclick = loadConversations;
+$("openSettings").onclick = () => api("/api/open-privacy-settings", {});
+$("export").onclick = startExport;
+$("showFolder").onclick = () => api("/api/open-export", {});
+$("browse").onclick = async () => {
+  const res = await api("/api/choose-folder", { initial: $("folder").value });
+  if (res.path) $("folder").value = res.path;
+};
+$("chooseBackup").onclick = async () => {
+  if (!$("chooseBackup").dataset.dialogs) { $("manualBackup").classList.toggle("hidden"); return; }
+  const res = await api("/api/choose-backup", {});
+  if (res.error) { showError(res.error); return; }
+  if (res.source) { await loadSources(sourceKey(res.source)); loadConversations(); }
+};
+$("addBackup").onclick = async () => {
+  const res = await api("/api/add-backup", { path: $("backupPath").value.trim() });
+  if (res.error) { showError(res.error); return; }
+  $("manualBackup").classList.add("hidden");
+  await loadSources(sourceKey(res.source));
+  loadConversations();
+};
+$("quit").onclick = async () => {
+  await api("/api/quit", {});
+  document.body.innerHTML = "<main><h2>Download My Messages has stopped.</h2><p>You can close this tab.</p></main>";
+};
+setInterval(() => api("/api/heartbeat", {}).catch(() => {}), 30000);
+
+(async () => {
+  try {
+    await loadSources();
+    await loadConversations();
+  } catch (e) {
+    showError(e.message);
+  }
+})();
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@ Export your iMessages and SMS to CSV and JSON. You choose which conversations to
 There are two versions:
 
 - **Mac app** (`mac/`): native SwiftUI app. Reads the Messages app's database on your Mac, or an iPhone backup made in Finder.
-- **Cross-platform app** (`desktop/`, coming next): runs on Mac and Windows.
+- **Cross-platform app** (`desktop/`): Python with a browser-based window. Runs on Mac and Windows, reads the Mac database or iPhone backups.
 
 ## Where your messages come from
 
@@ -45,3 +45,13 @@ swift run SelfTest          # checks against a fake Messages database
 ```
 
 After rebuilding, macOS may ask you to grant Full Disk Access again, because the app's ad-hoc signature changes with each build.
+
+## Using the cross-platform app (Mac and Windows)
+
+1. Download the build for your system from the Actions tab ("Cross-platform app" > Artifacts): `Download-My-Messages-windows` or `Download-My-Messages-crossplatform-mac`.
+2. Open it. Windows may show a SmartScreen warning ("More info" > "Run anyway"). On Mac, right-click > Open the first time and allow Full Disk Access.
+3. The app opens a page in your web browser. It only listens on your own computer, and only that page can talk to it.
+4. On Windows, back up your iPhone first with the Apple Devices app (or iTunes), with "Encrypt local backup" turned off. The app finds backups automatically.
+5. Click **Quit** in the page when you're done (it also stops on its own after 10 minutes without the page open).
+
+To run it from source: `cd desktop && python run.py` (Python 3.10+, no other packages needed). Tests: `python -m pytest`.
