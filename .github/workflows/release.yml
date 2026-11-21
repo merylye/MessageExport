@@ -1,0 +1,68 @@
+name: Release
+
+# Push a tag like v0.1.0 to build both apps and publish them as a GitHub release.
+# The download links in the friends' guide use releases/latest/download/<file name>,
+# so keep these file names stable.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  mac-native:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cd mac && swift run SelfTest && ./scripts/build-app.sh
+      - run: mv "mac/build/Download My Messages.zip" Download-My-Messages-Mac.zip
+      - uses: actions/upload-artifact@v4
+        with: { name: mac-native, path: Download-My-Messages-Mac.zip }
+
+  mac-crossplatform:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pytest pyinstaller
+      - working-directory: desktop
+        run: |
+          python -m pytest -q
+          pyinstaller --noconfirm --windowed --name "Download My Messages" \
+            --add-data "messageexport/static:messageexport/static" run.py
+          cd dist && ditto -c -k --keepParent "Download My Messages.app" ../../Download-My-Messages-Mac-crossplatform.zip
+      - uses: actions/upload-artifact@v4
+        with: { name: mac-crossplatform, path: Download-My-Messages-Mac-crossplatform.zip }
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run: { shell: bash }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pytest pyinstaller
+      - working-directory: desktop
+        run: |
+          python -m pytest -q
+          pyinstaller --noconfirm --onefile --windowed --name "Download My Messages" \
+            --add-data "messageexport/static;messageexport/static" run.py
+          mv "dist/Download My Messages.exe" ../Download-My-Messages-Windows.exe
+      - uses: actions/upload-artifact@v4
+        with: { name: windows, path: Download-My-Messages-Windows.exe }
+
+  publish:
+    needs: [mac-native, mac-crossplatform, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: assets, merge-multiple: true }
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" \
+            --title "Download My Messages $GITHUB_REF_NAME" \
+            --notes "Download-My-Messages-Mac.zip is the Mac app. Download-My-Messages-Windows.exe is the Windows app. Download-My-Messages-Mac-crossplatform.zip is the browser-based version for Mac, for comparison."

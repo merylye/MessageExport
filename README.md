@@ -17,7 +17,7 @@ iPhone apps can't read Messages, so an export always goes through a computer.
 ## Using the Mac app
 
 1. Download `Download My Messages.zip` from the latest build (Actions tab > Mac app > Artifacts), unzip it, and move the app to Applications.
-2. The first time, right-click the app and choose **Open** (the app isn't signed with a paid Apple Developer ID, so macOS warns you).
+2. The first time, double-click the app and click **Done** on the warning. Then open System Settings > Privacy & Security, scroll down, and click **Open Anyway** (the app isn't signed with a paid Apple Developer ID). On macOS 14 and earlier, right-click the app and choose **Open** instead.
 3. Allow **Full Disk Access** when the app asks (System Settings > Privacy & Security > Full Disk Access). macOS requires this for any app that reads Messages.
 4. Allow **Contacts** access if you want names instead of phone numbers.
 5. Tick the conversations you want, set a date range for each (presets or a custom calendar range), choose CSV and/or JSON, and click **Export…**.
@@ -49,7 +49,7 @@ After rebuilding, macOS may ask you to grant Full Disk Access again, because the
 ## Using the cross-platform app (Mac and Windows)
 
 1. Download the build for your system from the Actions tab ("Cross-platform app" > Artifacts): `Download-My-Messages-windows` or `Download-My-Messages-crossplatform-mac`.
-2. Open it. Windows may show a SmartScreen warning ("More info" > "Run anyway"). On Mac, right-click > Open the first time and allow Full Disk Access.
+2. Open it. Windows may show a SmartScreen warning ("More info" > "Run anyway"). On Mac, use **Open Anyway** in System Settings > Privacy & Security the first time, then allow Full Disk Access.
 3. The app opens a page in your web browser. It only listens on your own computer, and only that page can talk to it.
 4. On Windows, back up your iPhone first with the Apple Devices app (or iTunes), with "Encrypt local backup" turned off. The app finds backups automatically.
 5. Click **Quit** in the page when you're done (it also stops on its own after 10 minutes without the page open).
