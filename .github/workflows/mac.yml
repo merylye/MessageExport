@@ -1,0 +1,25 @@
+name: Mac app
+
+on:
+  push:
+    paths: ["mac/**", ".github/workflows/mac.yml"]
+  pull_request:
+    paths: ["mac/**", ".github/workflows/mac.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: mac
+    steps:
+      - uses: actions/checkout@v4
+      - name: Self-test (fake Messages database)
+        run: swift run SelfTest
+      - name: Build app
+        run: ./scripts/build-app.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Download-My-Messages-mac
+          path: mac/build/Download My Messages.zip
